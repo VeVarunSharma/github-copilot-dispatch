@@ -3,4 +3,6 @@ export const config = {
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || "",
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",
   NODE_ENV: process.env.NODE_ENV || "development",
+  BASE_URL: process.env.BASE_URL || "http://localhost:3001",
+  GH_TOKEN: process.env.GH_TOKEN || "",
 } as const;

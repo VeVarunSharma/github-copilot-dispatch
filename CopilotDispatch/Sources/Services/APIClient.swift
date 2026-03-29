@@ -25,7 +25,7 @@ actor APIClient {
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
-    var baseURL: String = "http://localhost:3001/api"
+    var baseURL: String = AppEnvironment.current.baseURL
     var authToken: String?
 
     private init() {
@@ -35,11 +35,9 @@ actor APIClient {
         self.session = URLSession(configuration: config)
 
         self.decoder = JSONDecoder()
-        self.decoder.keyDecodingStrategy = .convertFromSnakeCase
         self.decoder.dateDecodingStrategy = .iso8601
 
         self.encoder = JSONEncoder()
-        self.encoder.keyEncodingStrategy = .convertToSnakeCase
     }
 
     func setBaseURL(_ url: String) {
@@ -124,6 +122,58 @@ actor APIClient {
         return try await get("/repos", queryItems: queryItems)
     }
 
+    // MARK: - Pull Request Endpoints
+
+    func listPRs(owner: String, repo: String, state: String = "open", limit: Int = 20) async throws -> PRListResponse {
+        let queryItems = [
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        return try await get("/repos/\(owner)/\(repo)/pulls", queryItems: queryItems)
+    }
+
+    func getPR(owner: String, repo: String, number: Int) async throws -> PullRequestDetailModel {
+        return try await get("/repos/\(owner)/\(repo)/pulls/\(number)")
+    }
+
+    func submitReview(owner: String, repo: String, number: Int, event: String, body: String? = nil) async throws -> ReviewSubmittedResponse {
+        let requestBody = SubmitReviewAPIRequest(event: event, body: body)
+        return try await post("/repos/\(owner)/\(repo)/pulls/\(number)/review", body: requestBody)
+    }
+
+    func mergePR(owner: String, repo: String, number: Int, mergeMethod: String = "squash") async throws -> MergeResponse {
+        let requestBody = MergePRAPIRequest(mergeMethod: mergeMethod)
+        return try await put("/repos/\(owner)/\(repo)/pulls/\(number)/merge", body: requestBody)
+    }
+
+    func getPRChecks(owner: String, repo: String, number: Int) async throws -> PRChecksResponse {
+        return try await get("/repos/\(owner)/\(repo)/pulls/\(number)/checks")
+    }
+
+    // MARK: - Assignee & Reviewer Endpoints
+
+    func addAssignees(owner: String, repo: String, number: Int, assignees: [String]) async throws -> AssigneesUpdatedResponse {
+        let body = AddAssigneesAPIRequest(assignees: assignees)
+        return try await post("/repos/\(owner)/\(repo)/pulls/\(number)/assignees", body: body)
+    }
+
+    func removeAssignee(owner: String, repo: String, number: Int, login: String) async throws -> AssigneesUpdatedResponse {
+        return try await delete("/repos/\(owner)/\(repo)/pulls/\(number)/assignees/\(login)")
+    }
+
+    func requestReviewers(owner: String, repo: String, number: Int, reviewers: [String]) async throws -> ReviewersRequestedResponse {
+        let body = RequestReviewersAPIRequest(reviewers: reviewers)
+        return try await post("/repos/\(owner)/\(repo)/pulls/\(number)/reviewers", body: body)
+    }
+
+    func removeReviewer(owner: String, repo: String, number: Int, login: String) async throws -> ReviewersRequestedResponse {
+        return try await delete("/repos/\(owner)/\(repo)/pulls/\(number)/reviewers/\(login)")
+    }
+
+    func listCollaborators(owner: String, repo: String) async throws -> CollaboratorsResponse {
+        return try await get("/repos/\(owner)/\(repo)/collaborators")
+    }
+
     // MARK: - HTTP Methods
 
     private func get<T: Decodable>(_ path: String, queryItems: [URLQueryItem] = []) async throws
@@ -145,6 +195,11 @@ actor APIClient {
 
     private func delete<T: Decodable>(_ path: String) async throws -> T {
         let (data, _) = try await rawRequest(.delete, path: path)
+        return try decodeResponse(data)
+    }
+
+    private func put<B: Encodable, T: Decodable>(_ path: String, body: B) async throws -> T {
+        let (data, _) = try await rawRequest(.put, path: path, body: body)
         return try decodeResponse(data)
     }
 
@@ -281,4 +336,13 @@ struct ErrorBody: Codable, Sendable {
     let error: String
     let message: String
     let statusCode: Int
+}
+
+struct SubmitReviewAPIRequest: Codable, Sendable {
+    let event: String
+    let body: String?
+}
+
+struct MergePRAPIRequest: Codable, Sendable {
+    let mergeMethod: String
 }

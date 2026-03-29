@@ -8,7 +8,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "CopilotDispatch",
-            path: "Sources"
+            path: "Sources",
+            resources: [
+                .copy("Resources")
+            ]
         )
     ]
 )

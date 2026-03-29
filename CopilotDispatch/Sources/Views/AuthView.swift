@@ -6,9 +6,7 @@ struct AuthView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: GitHubSpacing.md) {
-                Image(systemName: "lock.shield")
-                    .font(.system(size: 30))
-                    .foregroundStyle(GitHubColors.purple)
+                GitHubIcon.logo(size: 36)
 
                 Text("Sign in to GitHub")
                     .font(GitHubTypography.headline)
@@ -16,7 +14,7 @@ struct AuthView: View {
 
                 if viewModel.isLoading {
                     ProgressView()
-                        .tint(GitHubColors.purple)
+                        .tint(GitHubColors.green)
                     Text("Requesting code...")
                         .font(GitHubTypography.caption)
                         .foregroundStyle(GitHubColors.textMuted)

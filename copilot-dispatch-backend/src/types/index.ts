@@ -111,3 +111,83 @@ export interface AuthenticatedRequest extends Request {
   user?: GitHubUser;
   token?: string;
 }
+
+// ─── Pull Request Types ───
+
+export type PRState = 'open' | 'closed' | 'merged';
+
+export type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
+
+export type MergeMethod = 'merge' | 'squash' | 'rebase';
+
+export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required' | null;
+
+export interface PRUser {
+  login: string;
+  avatarUrl: string;
+}
+
+export interface PullRequest {
+  number: number;
+  title: string;
+  author: string;
+  branch: string;
+  baseBranch: string;
+  state: PRState;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  ciStatus: string | null; // 'success' | 'failure' | 'pending' | null
+  mergeable: boolean | null;
+  draft: boolean;
+  assignees: PRUser[];
+  reviewers: PRUser[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PullRequestFile {
+  filename: string;
+  status: string; // 'added' | 'modified' | 'removed' | 'renamed'
+  additions: number;
+  deletions: number;
+}
+
+export interface CheckRun {
+  name: string;
+  status: string; // 'queued' | 'in_progress' | 'completed'
+  conclusion: CheckConclusion;
+}
+
+export interface PRComment {
+  id: number;
+  author: string;
+  authorAvatarUrl: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface PullRequestDetail extends PullRequest {
+  body: string | null;
+  files: PullRequestFile[];
+  checks: CheckRun[];
+  comments: PRComment[];
+}
+
+// PR API request types
+export interface SubmitReviewRequest {
+  event: ReviewEvent;
+  body?: string;
+}
+
+export interface MergePRRequest {
+  mergeMethod?: MergeMethod;
+}
+
+export interface AddAssigneesRequest {
+  assignees: string[];
+}
+
+export interface RequestReviewersRequest {
+  reviewers: string[];
+}

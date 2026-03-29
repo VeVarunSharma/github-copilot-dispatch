@@ -12,11 +12,9 @@ struct SettingsView: View {
             VStack(spacing: GitHubSpacing.md) {
                 if isLoading {
                     ProgressView()
-                        .tint(GitHubColors.purple)
+                        .tint(GitHubColors.green)
                 } else if let user {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(GitHubColors.purple)
+                    GitHubIcon.logo(size: 40)
 
                     Text(user.login)
                         .font(GitHubTypography.headline)

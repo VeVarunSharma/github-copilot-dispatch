@@ -1,5 +1,9 @@
 import SwiftUI
 
+// GitHub brand typeface is Mona Sans (brand.github.com/foundations/typography).
+// On watchOS we use SF Pro / SF Mono (the platform system fonts) which share
+// similar proportions and optical-size behavior. Sizes follow the brand type
+// scale adapted for the watch form factor.
 enum GitHubTypography {
     static let title = Font.system(size: 20, weight: .bold)
     static let headline = Font.system(size: 17, weight: .semibold)

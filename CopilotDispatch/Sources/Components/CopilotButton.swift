@@ -13,8 +13,8 @@ struct CopilotButton: View {
 
         var backgroundColor: Color {
             switch self {
-            case .primary: return GitHubColors.purple
-            case .secondary: return GitHubColors.surface
+            case .primary: return GitHubColors.btnPrimary
+            case .secondary: return GitHubColors.btnSecondary
             case .danger: return GitHubColors.red
             }
         }

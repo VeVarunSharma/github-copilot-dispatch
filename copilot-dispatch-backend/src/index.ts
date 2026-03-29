@@ -6,6 +6,7 @@ import { errorHandler, requestLogger } from "./middleware/error.js";
 import authRouter from "./routes/auth.js";
 import reposRouter from "./routes/repos.js";
 import sessionsRouter from "./routes/sessions.js";
+import pullsRouter from "./routes/pulls.js";
 import { initCopilotClient } from "./services/copilot.js";
 
 const app = express();
@@ -20,6 +21,7 @@ app.use(requestLogger);
 app.use("/api/auth", authRouter);
 app.use("/api/repos", reposRouter);
 app.use("/api/sessions", sessionsRouter);
+app.use("/api/repos/:owner/:repo/pulls", pullsRouter);
 
 // Health check
 app.get("/api/health", (_req, res) => {

@@ -189,16 +189,42 @@ Poll for completed authentication.
 
 #### `GET /api/auth/user`
 
-Get authenticated user info. **Protected.**
+Get authenticated user profile. **Protected.**
+
+Returns extended profile information from the GitHub API.
 
 **Response `200`:**
 ```json
 {
   "login": "octocat",
   "name": "The Octocat",
-  "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4"
+  "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4",
+  "bio": "There once was...",
+  "company": "GitHub",
+  "location": "San Francisco",
+  "email": "octocat@github.com",
+  "publicRepos": 42,
+  "followers": 200,
+  "following": 15,
+  "createdAt": "2008-01-14T04:33:35Z",
+  "plan": "copilot_pro_plus"
 }
 ```
+
+| Field         | Type             | Description                                         |
+| ------------- | ---------------- | --------------------------------------------------- |
+| `login`       | `string`         | GitHub username                                     |
+| `name`        | `string \| null` | Display name                                        |
+| `avatarUrl`   | `string`         | Profile avatar URL                                  |
+| `bio`         | `string \| null` | User bio                                            |
+| `company`     | `string \| null` | Company name                                        |
+| `location`    | `string \| null` | Location                                            |
+| `email`       | `string \| null` | Public email (if set)                               |
+| `publicRepos` | `number`         | Number of public repositories                       |
+| `followers`   | `number`         | Follower count                                      |
+| `following`   | `number`         | Following count                                     |
+| `createdAt`   | `string`         | Account creation date (ISO 8601)                    |
+| `plan`        | `string \| null` | GitHub/Copilot plan name (e.g., `copilot_pro_plus`) |
 
 ---
 
@@ -213,9 +239,17 @@ Create a new Copilot agent session. **Protected.**
 {
   "repo": "owner/repo-name",
   "prompt": "Fix the failing test in src/utils.test.ts",
-  "model": "claude-sonnet-4.5"
+  "model": "claude-sonnet-4.5",
+  "branch": "main"
 }
 ```
+
+| Field    | Type     | Required | Default                        | Description                                      |
+| -------- | -------- | -------- | ------------------------------ | ------------------------------------------------ |
+| `repo`   | `string` | Yes      | —                              | Repository full name (`owner/repo`)              |
+| `prompt` | `string` | Yes      | —                              | Task description for the agent                   |
+| `model`  | `string` | No       | `"auto"`                       | AI model ID (see `GET /api/models` for options)  |
+| `branch` | `string` | No       | Repository default branch      | Base branch the agent will branch off from        |
 
 **Response `201`:**
 ```json
@@ -225,6 +259,7 @@ Create a new Copilot agent session. **Protected.**
   "repo": "owner/repo-name",
   "prompt": "Fix the failing test in src/utils.test.ts",
   "model": "claude-sonnet-4.5",
+  "branch": "main",
   "events": [],
   "createdAt": "2026-03-29T00:00:00Z",
   "updatedAt": "2026-03-29T00:00:00Z"
@@ -249,6 +284,7 @@ List active/recent sessions. **Protected.**
       "repo": "owner/repo-name",
       "prompt": "Fix the failing test...",
       "model": "claude-sonnet-4.5",
+      "branch": "main",
       "eventCount": 12,
       "createdAt": "2026-03-29T00:00:00Z",
       "updatedAt": "2026-03-29T00:01:30Z"
@@ -272,6 +308,7 @@ Get session detail with buffered output events. **Protected.**
   "repo": "owner/repo-name",
   "prompt": "Fix the failing test in src/utils.test.ts",
   "model": "claude-sonnet-4.5",
+  "branch": "main",
   "events": [
     {
       "index": 0,
@@ -337,7 +374,7 @@ Cancel/stop a running session. **Protected.**
 List authenticated user's repositories. **Protected.**
 
 **Query params:**
-- `sort` (optional): `updated` (default), `name`, `created`
+- `sort` (optional): `updated` (default), `name`, `created`, `stars`
 - `limit` (optional, default: 30)
 
 **Response `200`:**
@@ -350,6 +387,9 @@ List authenticated user's repositories. **Protected.**
       "owner": "owner",
       "description": "A cool project",
       "language": "TypeScript",
+      "defaultBranch": "main",
+      "stargazersCount": 42,
+      "forksCount": 12,
       "updatedAt": "2026-03-28T12:00:00Z",
       "isPrivate": false
     }
@@ -361,9 +401,46 @@ List authenticated user's repositories. **Protected.**
 
 ### 4.4 Pull Request Endpoints (Phase 2)
 
+#### `GET /api/pulls/recent`
+
+List recent pull requests across all of the user's repositories. **Protected.**
+
+Uses the GitHub Search API to find PRs authored by or involving the authenticated user, sorted by most recently updated. This powers the "Recent" tab in the Pull Requests view.
+
+**Query params:**
+- `state` (optional): `open` (default), `closed`, `all`
+- `author` (optional): Filter by PR author (e.g., `copilot[bot]`)
+- `limit` (optional, default: 20)
+
+**Response `200`:**
+```json
+{
+  "pullRequests": [
+    {
+      "number": 42,
+      "title": "Fix utils test edge case",
+      "author": "copilot[bot]",
+      "repo": "owner/repo-name",
+      "branch": "copilot/fix-42",
+      "baseBranch": "main",
+      "state": "open",
+      "additions": 15,
+      "deletions": 3,
+      "changedFiles": 2,
+      "ciStatus": "success",
+      "draft": false,
+      "createdAt": "2026-03-29T00:05:00Z",
+      "updatedAt": "2026-03-29T00:10:00Z"
+    }
+  ]
+}
+```
+
+> **Note:** The `repo` field (full name `owner/repo`) is included in recent PRs since they span multiple repositories. This field is not present in per-repo PR list responses.
+
 #### `GET /api/repos/:owner/:repo/pulls`
 
-List open pull requests. **Protected.**
+List open pull requests for a specific repository. **Protected.**
 
 **Query params:**
 - `state` (optional): `open` (default), `closed`, `all`
@@ -546,9 +623,17 @@ Launch agent session from a GitHub issue. **Protected.**
 {
   "repo": "owner/repo",
   "issueNumber": 42,
-  "model": "claude-sonnet-4.5"
+  "model": "claude-sonnet-4.5",
+  "branch": "main"
 }
 ```
+
+| Field         | Type     | Required | Default                   | Description                                     |
+| ------------- | -------- | -------- | ------------------------- | ----------------------------------------------- |
+| `repo`        | `string` | Yes      | —                         | Repository full name                            |
+| `issueNumber` | `number` | Yes      | —                         | GitHub issue number                             |
+| `model`       | `string` | No       | `"auto"`                  | AI model ID                                     |
+| `branch`      | `string` | No       | Repository default branch | Base branch the agent will branch off from       |
 
 #### `POST /api/tasks/from-template`
 
@@ -562,13 +647,124 @@ Launch agent session from a template. **Protected.**
     "repo": "owner/repo",
     "issue_number": "42"
   },
-  "model": "claude-sonnet-4.5"
+  "model": "claude-sonnet-4.5",
+  "branch": "develop"
+}
+```
+
+| Field        | Type     | Required | Default                   | Description                                |
+| ------------ | -------- | -------- | ------------------------- | ------------------------------------------ |
+| `templateId` | `string` | Yes      | —                         | Template ID                                |
+| `variables`  | `object` | Yes      | —                         | Template variable substitutions            |
+| `model`      | `string` | No       | `"auto"`                  | AI model ID                                |
+| `branch`     | `string` | No       | Repository default branch | Base branch the agent will branch off from  |
+
+---
+
+### 4.6 Model & Branch Endpoints
+
+#### `GET /api/models`
+
+List available AI models for agent sessions. **Protected.**
+
+Returns all models the authenticated user can use, based on their Copilot subscription tier. Models are grouped by provider.
+
+**Response `200`:**
+```json
+{
+  "models": [
+    {
+      "id": "auto",
+      "displayName": "Auto",
+      "provider": "github",
+      "description": "Copilot auto-selects the best model based on availability",
+      "isDefault": true
+    },
+    {
+      "id": "claude-sonnet-4.5",
+      "displayName": "Claude Sonnet 4.5",
+      "provider": "anthropic",
+      "description": "Fast, balanced performance for most coding tasks",
+      "isDefault": false
+    },
+    {
+      "id": "claude-opus-4.5",
+      "displayName": "Claude Opus 4.5",
+      "provider": "anthropic",
+      "description": "Premium model for complex reasoning",
+      "isDefault": false
+    },
+    {
+      "id": "claude-opus-4.6",
+      "displayName": "Claude Opus 4.6",
+      "provider": "anthropic",
+      "description": "Latest premium model with enhanced capabilities",
+      "isDefault": false
+    },
+    {
+      "id": "gpt-5.1-codex-max",
+      "displayName": "GPT-5.1-Codex-Max",
+      "provider": "openai",
+      "description": "High-capability code generation model",
+      "isDefault": false
+    },
+    {
+      "id": "gpt-5.2-codex",
+      "displayName": "GPT-5.2-Codex",
+      "provider": "openai",
+      "description": "Latest OpenAI code model",
+      "isDefault": false
+    }
+  ]
+}
+```
+
+**Model Providers:**
+
+| Provider     | Type | Models                                                    |
+| ------------ | ---- | --------------------------------------------------------- |
+| `github`     | 1P   | `auto` — Copilot auto model selection                     |
+| `anthropic`  | 3P   | `claude-sonnet-4.5`, `claude-opus-4.5`, `claude-opus-4.6` |
+| `openai`     | 3P   | `gpt-5.1-codex-max`, `gpt-5.2-codex`                     |
+
+> **Note:** Available models depend on the user's Copilot subscription tier. Pro+ users have access to all models. Pro/Business/Enterprise users may have a subset. The `auto` option is always available.
+
+#### `GET /api/repos/:owner/:repo/branches`
+
+List branches for a repository. **Protected.**
+
+Used by the branch picker when creating a new session. Returns branches sorted with the default branch first.
+
+**Query params:**
+- `limit` (optional, default: 30)
+
+**Response `200`:**
+```json
+{
+  "branches": [
+    {
+      "name": "main",
+      "isDefault": true,
+      "protected": true
+    },
+    {
+      "name": "develop",
+      "isDefault": false,
+      "protected": false
+    },
+    {
+      "name": "feature/auth-flow",
+      "isDefault": false,
+      "protected": false
+    }
+  ],
+  "defaultBranch": "main"
 }
 ```
 
 ---
 
-### 4.6 Notification Endpoints (Phase 4)
+### 4.7 Notification Endpoints (Phase 4)
 
 #### `POST /api/devices`
 
@@ -608,19 +804,20 @@ List recent notifications. **Protected.**
 
 ### 5.1 Session
 
-| Field          | Type               | Description                                    |
-| -------------- | ------------------ | ---------------------------------------------- |
-| `id`           | `string`           | Unique session ID (e.g., `sess_abc123`)        |
-| `userId`       | `string`           | GitHub username of session owner                |
-| `status`       | `SessionStatus`    | Current session state                          |
-| `repo`         | `string`           | Repository full name (`owner/repo`)            |
-| `prompt`       | `string`           | Initial task description                       |
-| `model`        | `string`           | AI model used                                  |
-| `events`       | `SessionEvent[]`   | Ordered list of session events                 |
-| `pullRequestUrl` | `string \| null` | URL of created PR (if any)                     |
-| `error`        | `string \| null`   | Error message (if failed)                      |
-| `createdAt`    | `string` (ISO)     | Session creation timestamp                     |
-| `updatedAt`    | `string` (ISO)     | Last update timestamp                          |
+| Field            | Type               | Description                                    |
+| ---------------- | ------------------ | ---------------------------------------------- |
+| `id`             | `string`           | Unique session ID (e.g., `sess_abc123`)        |
+| `userId`         | `string`           | GitHub username of session owner                |
+| `status`         | `SessionStatus`    | Current session state                          |
+| `repo`           | `string`           | Repository full name (`owner/repo`)            |
+| `prompt`         | `string`           | Initial task description                       |
+| `model`          | `string`           | AI model ID used (see §4.6 for options)        |
+| `branch`         | `string`           | Base branch the agent branched off from         |
+| `events`         | `SessionEvent[]`   | Ordered list of session events                 |
+| `pullRequestUrl` | `string \| null`   | URL of created PR (if any)                     |
+| `error`          | `string \| null`   | Error message (if failed)                      |
+| `createdAt`      | `string` (ISO)     | Session creation timestamp                     |
+| `updatedAt`      | `string` (ISO)     | Last update timestamp                          |
 
 ### 5.2 SessionStatus (enum)
 
@@ -655,23 +852,61 @@ List recent notifications. **Protected.**
 
 ### 5.4 Repository
 
-| Field         | Type      | Description                    |
-| ------------- | --------- | ------------------------------ |
-| `fullName`    | `string`  | `owner/repo-name`             |
-| `name`        | `string`  | Repository name                |
-| `owner`       | `string`  | Repository owner               |
-| `description` | `string`  | Repo description               |
-| `language`    | `string`  | Primary language               |
-| `updatedAt`   | `string`  | Last push/update               |
-| `isPrivate`   | `boolean` | Visibility                     |
+| Field             | Type      | Description                          |
+| ----------------- | --------- | ------------------------------------ |
+| `fullName`        | `string`  | `owner/repo-name`                   |
+| `name`            | `string`  | Repository name                      |
+| `owner`           | `string`  | Repository owner                     |
+| `description`     | `string`  | Repo description                     |
+| `language`        | `string`  | Primary language                     |
+| `defaultBranch`   | `string`  | Default branch name (e.g., `main`)   |
+| `stargazersCount` | `number`  | Number of stars                      |
+| `forksCount`      | `number`  | Number of forks                      |
+| `updatedAt`       | `string`  | Last push/update                     |
+| `isPrivate`       | `boolean` | Visibility                           |
 
-### 5.5 User
+### 5.5 AIModel
 
-| Field       | Type     | Description              |
-| ----------- | -------- | ------------------------ |
-| `login`     | `string` | GitHub username           |
-| `name`      | `string` | Display name              |
-| `avatarUrl` | `string` | Profile avatar URL        |
+| Field         | Type      | Description                                      |
+| ------------- | --------- | ------------------------------------------------ |
+| `id`          | `string`  | Model identifier (e.g., `claude-sonnet-4.5`)     |
+| `displayName` | `string` | Human-readable name (e.g., `Claude Sonnet 4.5`)  |
+| `provider`    | `string`  | Provider: `github`, `anthropic`, or `openai`     |
+| `description` | `string`  | Short description of model capabilities           |
+| `isDefault`   | `boolean` | Whether this is the default model (`auto`)        |
+
+**Provider types:**
+
+| Provider    | Type | Description                                       |
+| ----------- | ---- | ------------------------------------------------- |
+| `github`    | 1P   | GitHub's own model selection (auto)               |
+| `anthropic` | 3P   | Third-party Claude models                         |
+| `openai`    | 3P   | Third-party GPT/Codex models                      |
+
+### 5.6 Branch
+
+| Field       | Type      | Description                    |
+| ----------- | --------- | ------------------------------ |
+| `name`      | `string`  | Branch name                    |
+| `isDefault` | `boolean` | Whether this is the default branch |
+| `protected` | `boolean` | Whether branch has protection rules |
+
+### 5.7 User
+
+| Field         | Type             | Description                                         |
+| ------------- | ---------------- | --------------------------------------------------- |
+| `login`       | `string`         | GitHub username                                     |
+| `name`        | `string \| null` | Display name                                        |
+| `avatarUrl`   | `string`         | Profile avatar URL                                  |
+| `bio`         | `string \| null` | User bio                                            |
+| `company`     | `string \| null` | Company name                                        |
+| `location`    | `string \| null` | Location                                            |
+| `email`       | `string \| null` | Public email (if set)                               |
+| `publicRepos` | `number`         | Number of public repositories                       |
+| `followers`   | `number`         | Follower count                                      |
+| `following`   | `number`         | Following count                                     |
+| `createdAt`   | `string`         | Account creation date (ISO 8601)                    |
+| `plan`        | `string \| null` | GitHub/Copilot plan name                            |
 
 ---
 
@@ -718,6 +953,8 @@ Main dashboard after authentication.
 │                          │
 │  [+ New Session]         │
 │  [📋 Sessions]           │
+│  [🔀 Pull Requests]      │
+│  [📂 Repositories]       │
 │  [⚙️ Settings]           │
 │                          │
 │  Recent:                 │
@@ -729,7 +966,7 @@ Main dashboard after authentication.
 
 - Copilot branding with accent color
 - Active agent count with pulse animation
-- Quick action navigation buttons
+- Quick action navigation buttons (Sessions, Pull Requests, Repositories, Settings)
 - Recent activity timeline
 
 ### 6.3 Session List
@@ -765,7 +1002,8 @@ Terminal-inspired output view.
 ```
 ┌──────────────────────────┐
 │  Fix issue #42    🟢     │
-│  owner/repo              │
+│  owner/repo · main      │
+│  🤖 Claude Sonnet 4.5    │
 │                          │
 │ ┌────────────────────┐   │
 │ │ > Reading issue #42│   │
@@ -783,11 +1021,15 @@ Terminal-inspired output view.
 
 - Dark background, monospace font (SF Mono)
 - Auto-scrolling terminal output
-- Status badge in top-right
+- **Header:** Task prompt + status badge (top-right)
+- **Subtitle:** Repo name + branch name separated by `·`
+- **Model badge:** Shows model name with `🤖` icon
 - Action buttons at bottom
 - "View PR" button appears when PR is opened
 
 ### 6.5 New Session Screen
+
+Mirrors the github.com agent session launcher with repo, branch, model, and task fields.
 
 ```
 ┌──────────────────────────┐
@@ -796,6 +1038,16 @@ Terminal-inspired output view.
 │  Repository:             │
 │  ┌────────────────────┐  │
 │  │ owner/repo-name  ▾ │  │
+│  └────────────────────┘  │
+│                          │
+│  Branch:                 │
+│  ┌────────────────────┐  │
+│  │ 🌿 main (default) ▾│  │
+│  └────────────────────┘  │
+│                          │
+│  Model:                  │
+│  ┌────────────────────┐  │
+│  │ 🤖 Auto          ▾ │  │
 │  └────────────────────┘  │
 │                          │
 │  Task:                   │
@@ -810,11 +1062,105 @@ Terminal-inspired output view.
 └──────────────────────────┘
 ```
 
-- Repo picker (scrollable list, recent repos first)
-- Voice dictation button (primary input method on Watch)
-- Launch button with haptic confirmation (`.success`)
+- **Repo picker:** Scrollable list, recent repos first
+- **Branch picker:** Loaded after repo selection, default branch pre-selected. Shows branch name with `🌿` icon. Protected branches shown with lock icon.
+- **Model picker:** Grouped by provider (GitHub → Anthropic → OpenAI). Default is "Auto". Shows provider badge next to model name.
+- **Task input:** Voice dictation button (primary input on Watch), or text field
+- **Launch button:** Disabled until repo + task are filled. Haptic `.success` on launch.
 
-### 6.6 PR Review Screen (Phase 2)
+#### Model Picker Detail
+
+```
+┌──────────────────────────┐
+│  Select Model            │
+│                          │
+│  ─── GitHub ───          │
+│  ✓ Auto (recommended)    │
+│                          │
+│  ─── Anthropic ───       │
+│    Claude Sonnet 4.5     │
+│    Claude Opus 4.5       │
+│    Claude Opus 4.6       │
+│                          │
+│  ─── OpenAI ───          │
+│    GPT-5.1-Codex-Max     │
+│    GPT-5.2-Codex         │
+│                          │
+└──────────────────────────┘
+```
+
+#### Branch Picker Detail
+
+```
+┌──────────────────────────┐
+│  Select Branch           │
+│                          │
+│  ✓ main  (default) 🔒   │
+│    develop               │
+│    feature/auth-flow     │
+│    feature/watch-ui      │
+│    fix/polling-interval  │
+│                          │
+└──────────────────────────┘
+```
+
+### 6.6 Pull Requests Screen
+
+The Pull Requests view supports two modes: **Recent** (cross-repo) and **By Repo** (single repo).
+
+#### Recent Mode (default)
+
+Shows recent PRs across all of the user's repositories, sorted by most recently updated.
+
+```
+┌──────────────────────────┐
+│  Pull Requests           │
+│                          │
+│  [Recent ✓] [By Repo]   │
+│                          │
+│  🟢 #42 Fix utils edge  │
+│     owner/repo  copilot  │
+│     ✅ CI  · 2m ago      │
+│                          │
+│  🟣 #38 Add auth flow   │
+│     other/repo  merged   │
+│     · 1h ago             │
+│                          │
+│  🟢 #15 Update docs     │
+│     my/project  draft    │
+│     ⏳ CI  · 3h ago      │
+│                          │
+└──────────────────────────┘
+```
+
+- **Mode toggle:** "Recent" (cross-repo) / "By Repo" (single repo with picker)
+- **PR row:** Status dot, PR number + title, repo name (since cross-repo), author, CI badge, relative time
+- **Tap → PR Detail** (§6.7)
+
+#### By Repo Mode
+
+Same as current behavior — repo picker at top, shows PRs for selected repo only.
+
+```
+┌──────────────────────────┐
+│  Pull Requests           │
+│                          │
+│  [Recent] [By Repo ✓]   │
+│                          │
+│  ┌────────────────────┐  │
+│  │ owner/repo-name  ▾ │  │
+│  └────────────────────┘  │
+│                          │
+│  🟢 #42 Fix utils edge  │
+│     copilot[bot]  ✅ CI  │
+│                          │
+│  🟢 #40 Add logging     │
+│     octocat  ⏳ CI       │
+│                          │
+└──────────────────────────┘
+```
+
+### 6.7 PR Detail Screen (Phase 2)
 
 ```
 ┌──────────────────────────┐
@@ -836,7 +1182,7 @@ Terminal-inspired output view.
 └──────────────────────────┘
 ```
 
-### 6.7 Settings Screen
+### 6.8 Settings & Profile Screen
 
 ```
 ┌──────────────────────────┐
@@ -844,11 +1190,101 @@ Terminal-inspired output view.
 │                          │
 │  👤 octocat              │
 │     The Octocat          │
+│     "There once was..."  │
 │                          │
+│  🏢 GitHub               │
+│  📍 San Francisco        │
+│  📦 42 repos             │
+│  👥 200 followers · 15   │
+│  📅 Member since 2008    │
+│                          │
+│  ┌────────────────────┐  │
+│  │ 🟣 Copilot Pro+    │  │
+│  └────────────────────┘  │
+│                          │
+│  ─────────────────────── │
+│                          │
+│  [📂 Repositories]       │
 │  [Sign Out]              │
+│                          │
+│  Copilot Dispatch v0.1.0 │
 │                          │
 └──────────────────────────┘
 ```
+
+- **Profile card:** Avatar placeholder, username (headline), display name (muted)
+- **Bio:** Shown below name if present (caption, 2-line limit)
+- **Details:** Company with 🏢, location with 📍, repo count with 📦, followers/following with 👥, member since with 📅
+- **Copilot plan badge:** Purple-tinted badge showing subscription tier
+- **Repositories link:** Navigates to the full Repositories view (§6.9)
+- **Sign Out:** Red button with confirmation dialog
+- **Version:** App version in subtle text at bottom
+
+### 6.9 Repositories Screen
+
+Browsable list of the user's repositories, accessible from HomeView and Settings.
+
+```
+┌──────────────────────────┐
+│  Repositories            │
+│                          │
+│  📂 awesome-project      │
+│     TypeScript  ⭐ 42  🔒│
+│     Updated 2h ago       │
+│                          │
+│  📂 api-service          │
+│     Go  ⭐ 128           │
+│     Updated 1d ago       │
+│                          │
+│  📂 mobile-app           │
+│     Swift  ⭐ 15  🔒     │
+│     Updated 3d ago       │
+│                          │
+│  📂 docs-site            │
+│     MDX  ⭐ 5            │
+│     Updated 1w ago       │
+│                          │
+└──────────────────────────┘
+```
+
+- **Repo row:** Repo name, primary language badge, star count, 🔒 for private repos
+- **Subtitle:** Relative time since last update
+- **Sorted by:** Most recently updated (default), with option to sort by name or stars
+- **Tap → Repo Detail** (§6.9)
+
+### 6.10 Repository Detail Screen
+
+Detail view for a single repository. Provides shortcuts to launch sessions and view PRs.
+
+```
+┌──────────────────────────┐
+│  awesome-project         │
+│  owner/awesome-project   │
+│                          │
+│  A cool project that...  │
+│                          │
+│  TypeScript · ⭐ 42 · 🍴12│
+│  🌿 main (default)       │
+│  🔒 Private              │
+│                          │
+│  ─────────────────────── │
+│                          │
+│  [🚀 New Session]        │
+│  [🔀 Pull Requests (3)]  │
+│  [🌿 Branches (5)]       │
+│                          │
+└──────────────────────────┘
+```
+
+- **Header:** Repo name (headline) + full name (muted)
+- **Description:** Repo description (caption, 3-line limit)
+- **Stats row:** Language, stars, forks
+- **Default branch:** Shown with 🌿 icon
+- **Visibility badge:** 🔒 Private or 🌐 Public
+- **Actions:**
+  - "New Session" → Pre-fills repo in NewSessionView
+  - "Pull Requests" → Navigates to PRListView filtered to this repo
+  - "Branches" → Shows branch list for this repo
 
 ---
 
@@ -856,22 +1292,27 @@ Terminal-inspired output view.
 
 ### 7.1 Color Tokens
 
-| Token          | Hex       | Usage                           |
-| -------------- | --------- | ------------------------------- |
-| `background`   | `#0d1117` | App background                  |
-| `surface`      | `#161b22` | Cards, elevated surfaces        |
-| `surfaceHover` | `#1c2129` | Pressed/highlighted surfaces    |
-| `border`       | `#30363d` | Borders, dividers               |
-| `borderMuted`  | `#21262d` | Subtle borders                  |
-| `text`         | `#e6edf3` | Primary text                    |
-| `textMuted`    | `#8b949e` | Secondary text                  |
-| `textSubtle`   | `#6e7681` | Tertiary text                   |
-| `green`        | `#3fb950` | Success, active, additions      |
-| `red`          | `#f85149` | Error, failure, deletions       |
-| `blue`         | `#58a6ff` | Info, links                     |
-| `purple`       | `#bc8cff` | Copilot accent                  |
-| `yellow`       | `#d29922` | Warning, pending                |
-| `orange`       | `#d18616` | Alert                           |
+Colors follow the [GitHub Brand Guidelines](https://brand.github.com/foundations/color) and [Copilot Theme](https://brand.github.com/brand-identity/copilot). Proportion target: 80% black/white, 10% neutral, 5% green, 5% purple.
+
+| Token          | Hex       | Usage                           | Brand ref          |
+| -------------- | --------- | ------------------------------- | ------------------ |
+| `background`   | `#0d1117` | App background                  | Dark theme         |
+| `surface`      | `#161b22` | Cards, elevated surfaces        | Dark theme         |
+| `surfaceHover` | `#1c2129` | Pressed/highlighted surfaces    | Dark theme         |
+| `border`       | `#30363d` | Borders, dividers               | Dark theme         |
+| `borderMuted`  | `#21262d` | Subtle borders                  | Dark theme         |
+| `text`         | `#c9d1d9` | Primary text                    | —                  |
+| `textMuted`    | `#8b949e` | Secondary text                  | —                  |
+| `textSubtle`   | `#6e7681` | Tertiary text                   | —                  |
+| `green`        | `#0FBF3E` | Success, active, primary brand  | GitHub Green       |
+| `greenEmphasis`| `#08872B` | Button bg (AA with white text)  | Green 5            |
+| `purple`       | `#8534F3` | Copilot accent, AI loading      | Copilot Purple     |
+| `purpleLight`  | `#C898FD` | Muted purple backgrounds        | Purple 1           |
+| `purpleMuted`  | `#B870FF` | Purple highlights               | Purple 2           |
+| `blue`         | `#3094FF` | Info, links                     | Security Blue      |
+| `orange`       | `#F08A3A` | Alert                           | Orange 2           |
+| `red`          | `#f85149` | Error, failure, deletions       | Functional         |
+| `yellow`       | `#d29922` | Warning, pending                | Functional         |
 
 ### 7.2 Typography
 
@@ -932,6 +1373,8 @@ Terminal-inspired output view.
 | Repository        | `folder`                      |
 | Branch            | `arrow.triangle.branch`       |
 | Pull Request      | `arrow.triangle.pull`         |
+| Model / AI Engine | `cpu`                         |
+| Provider badge    | `building.2`                  |
 | Success           | `checkmark.circle.fill`       |
 | Failure           | `xmark.circle.fill`           |
 | Running           | `circle.fill` (green)         |
@@ -943,6 +1386,7 @@ Terminal-inspired output view.
 | Merge             | `arrow.triangle.merge`        |
 | Approve           | `hand.thumbsup.fill`          |
 | Add / New         | `plus.circle.fill`            |
+| Protected branch  | `lock.fill`                   |
 
 ---
 
@@ -1003,21 +1447,25 @@ Branded action button with GitHub styling.
 | Agent session CRUD API   | Planned     |
 | Copilot SDK integration  | Planned     |
 | Repository listing API   | Planned     |
+| Model listing API        | Planned     |
+| Branch listing API       | Planned     |
 | Watch auth flow UI       | Planned     |
 | Watch home screen        | Planned     |
 | Watch session list       | Planned     |
 | Watch session detail     | Planned     |
-| Watch new session        | Planned     |
-| Watch settings           | Planned     |
+| Watch new session (model + branch picker) | Planned |
+| Watch settings & profile | Planned     |
+| Watch repositories view  | Planned     |
 
 ### Phase 2 — PR Review & Approval
 
 - PR list and detail API endpoints
+- Recent PRs across all repos (cross-repo search)
 - AI-generated PR summary (via Copilot SDK)
 - PR review submission (approve/request changes/comment)
 - PR merge from Watch
 - CI status display
-- Watch PR list and detail screens
+- Watch PR list (Recent + By Repo modes) and detail screens
 
 ### Phase 3 — Code on the Go
 
@@ -1040,7 +1488,7 @@ Branded action button with GitHub styling.
 - Replace in-memory store with PostgreSQL/SQLite
 - Offline mode (cache last-known state, queue actions)
 - Token refresh flow
-- Advanced settings (default repo, model preference)
+- Advanced settings (default repo, default model preference, default branch)
 - Performance optimization (< 2s API response time)
 
 ---
@@ -1103,7 +1551,9 @@ github-copilot-dispatch/
 │   │   ├── routes/
 │   │   │   ├── auth.ts
 │   │   │   ├── sessions.ts
-│   │   │   └── repos.ts
+│   │   │   ├── repos.ts
+│   │   │   ├── pulls.ts
+│   │   │   └── models.ts
 │   │   ├── services/
 │   │   │   ├── copilot.ts
 │   │   │   ├── github.ts
@@ -1124,18 +1574,24 @@ github-copilot-dispatch/
     │   │   └── CopilotDispatchApp.swift
     │   ├── Models/
     │   │   ├── Session.swift
-    │   │   └── Repository.swift
+    │   │   ├── Repository.swift
+    │   │   └── PullRequest.swift
     │   ├── Views/
     │   │   ├── HomeView.swift
     │   │   ├── AuthView.swift
     │   │   ├── SessionListView.swift
     │   │   ├── SessionDetailView.swift
     │   │   ├── NewSessionView.swift
+    │   │   ├── PRListView.swift
+    │   │   ├── PRDetailView.swift
+    │   │   ├── RepoListView.swift
+    │   │   ├── RepoDetailView.swift
     │   │   └── SettingsView.swift
     │   ├── ViewModels/
     │   │   ├── AuthViewModel.swift
     │   │   ├── SessionsViewModel.swift
-    │   │   └── NewSessionViewModel.swift
+    │   │   ├── NewSessionViewModel.swift
+    │   │   └── PRListViewModel.swift
     │   ├── Services/
     │   │   ├── APIClient.swift
     │   │   └── KeychainManager.swift
@@ -1156,7 +1612,8 @@ github-copilot-dispatch/
 ## 12. Open Questions
 
 1. **Copilot SDK stability:** The SDK is in technical preview — API may change. Plan for adapter pattern to isolate SDK changes.
-2. **Model selection:** Should the Watch expose model choice to users, or use a backend default?
+2. ~~**Model selection:** Should the Watch expose model choice to users, or use a backend default?~~ **Resolved:** Yes — the Watch exposes a model picker with all available models (Auto, Claude, GPT/Codex). The default is "Auto" (Copilot auto-selects). See §4.6 and §6.5.
 3. **Session limits:** How many concurrent sessions per user? (Likely limited by Copilot subscription tier.)
 4. **PR merge protection:** Should we require CI checks to pass before allowing merge from Watch?
 5. **Offline queuing (Phase 5):** Which actions should be queueable offline? (New session, PR review, cancel?)
+6. **Model availability by tier:** The available model list may vary by Copilot subscription (Pro vs Pro+ vs Business vs Enterprise). The `GET /api/models` endpoint should filter based on the user's plan. Exact tier restrictions TBD — track GitHub docs for updates.

@@ -17,3 +17,11 @@ Thumbs.db
 .idea/
 *.swp
 *~
+
+# Environment files with secrets
+copilot-dispatch-backend/.env
+copilot-dispatch-backend/.env.staging
+copilot-dispatch-backend/.env.production
+
+# Keep templates
+!copilot-dispatch-backend/.env.example

@@ -13,8 +13,7 @@ struct HomeView: View {
                 VStack(spacing: GitHubSpacing.md) {
                     // Header with branding
                     HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(GitHubColors.purple)
+                        GitHubIcon.logo(size: 22)
                         Text("Copilot Dispatch")
                             .font(GitHubTypography.headline)
                             .foregroundStyle(GitHubColors.text)
@@ -42,8 +41,8 @@ struct HomeView: View {
                         Label("New Session", systemImage: "plus.circle.fill")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, GitHubSpacing.sm)
-                            .background(GitHubColors.purple)
-                            .foregroundStyle(.white)
+                            .background(GitHubColors.btnPrimary)
+                            .foregroundStyle(GitHubColors.btnPrimaryText)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
@@ -52,8 +51,18 @@ struct HomeView: View {
                         Label("Sessions", systemImage: "terminal")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, GitHubSpacing.sm)
-                            .background(GitHubColors.surface)
-                            .foregroundStyle(GitHubColors.text)
+                            .background(GitHubColors.btnSecondary)
+                            .foregroundStyle(GitHubColors.btnSecondaryText)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink(destination: PRListView()) {
+                        Label("Pull Requests", systemImage: "arrow.triangle.pull")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, GitHubSpacing.sm)
+                            .background(GitHubColors.btnSecondary)
+                            .foregroundStyle(GitHubColors.btnSecondaryText)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
@@ -62,8 +71,8 @@ struct HomeView: View {
                         Label("Settings", systemImage: "gearshape")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, GitHubSpacing.sm)
-                            .background(GitHubColors.surface)
-                            .foregroundStyle(GitHubColors.text)
+                            .background(GitHubColors.btnSecondary)
+                            .foregroundStyle(GitHubColors.btnSecondaryText)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)

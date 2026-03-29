@@ -1,16 +1,36 @@
-import { CopilotClient, CopilotSession, approveAll } from '@github/copilot-sdk';
-import type { SessionEvent as SdkSessionEvent } from '@github/copilot-sdk';
+// Dynamic import to handle environments where the SDK can't load (e.g. Node < 23.4)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let CopilotClientClass: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let approveAllFn: any = null;
+
 import type { SessionEvent, SessionEventType } from '../types/index.js';
 
 // Active SDK sessions keyed by our internal session ID
-const activeSdkSessions = new Map<string, CopilotSession>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const activeSdkSessions = new Map<string, any>();
 
-let client: CopilotClient | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let client: any = null;
+let sdkAvailable = false;
 
 export async function initCopilotClient(): Promise<void> {
-  client = new CopilotClient();
-  await client.start();
-  console.log('[Copilot] Client initialized');
+  try {
+    const sdk = await import('@github/copilot-sdk');
+    CopilotClientClass = sdk.CopilotClient;
+    approveAllFn = sdk.approveAll;
+    client = new CopilotClientClass();
+    await client.start();
+    sdkAvailable = true;
+    console.log('[Copilot] Client initialized');
+  } catch (error) {
+    sdkAvailable = false;
+    console.warn('[Copilot] SDK not available — agent sessions will return mock data.');
+    console.warn('[Copilot] To enable the SDK, upgrade to Node.js 23.4+ (required for node:sqlite).');
+    if (error instanceof Error) {
+      console.warn(`[Copilot] Error: ${error.message}`);
+    }
+  }
 }
 
 export async function stopCopilotClient(): Promise<void> {
@@ -30,6 +50,7 @@ interface CreateSessionOptions {
 }
 
 // Map SDK event types to our simplified SessionEventType
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapSdkEventType(sdkType: string): SessionEventType | null {
   switch (sdkType) {
     case 'assistant.message_delta':
@@ -49,7 +70,8 @@ function mapSdkEventType(sdkType: string): SessionEventType | null {
 }
 
 // Extract displayable content from an SDK event
-function extractContent(event: SdkSessionEvent): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractContent(event: any): string {
   const data = event.data as Record<string, unknown> | undefined;
   if (!data) return '';
 
@@ -69,9 +91,35 @@ function extractContent(event: SdkSessionEvent): string {
   return '';
 }
 
+// Simulate agent work when SDK is not available
+async function runMockSession(options: CreateSessionOptions): Promise<void> {
+  const { sessionId, prompt, onEvent, onStatusChange } = options;
+
+  onStatusChange('running');
+  onEvent({ type: 'status_change', content: 'Session started (mock mode)', timestamp: new Date().toISOString() });
+
+  const steps = [
+    { delay: 1000, type: 'tool_call' as const, content: `Analyzing: "${prompt}"` },
+    { delay: 1500, type: 'message_delta' as const, content: 'Looking at the repository structure...' },
+    { delay: 1000, type: 'tool_call' as const, content: 'Reading relevant files' },
+    { delay: 2000, type: 'message_delta' as const, content: 'Implementing changes...' },
+    { delay: 1500, type: 'message_complete' as const, content: 'Changes complete. This is a mock session — upgrade to Node.js 23.4+ to enable the real Copilot SDK.' },
+  ];
+
+  for (const step of steps) {
+    await new Promise(resolve => setTimeout(resolve, step.delay));
+    onEvent({ type: step.type, content: step.content, timestamp: new Date().toISOString() });
+  }
+
+  onStatusChange('completed');
+  onEvent({ type: 'status_change', content: 'Session completed', timestamp: new Date().toISOString() });
+  activeSdkSessions.delete(sessionId);
+}
+
 export async function createAgentSession(options: CreateSessionOptions): Promise<void> {
-  if (!client) {
-    throw new Error('Copilot client not initialized');
+  if (!sdkAvailable || !client) {
+    // Fall back to mock session
+    return runMockSession(options);
   }
 
   const { sessionId, model = 'claude-sonnet-4', prompt, onEvent, onStatusChange } = options;
@@ -79,7 +127,7 @@ export async function createAgentSession(options: CreateSessionOptions): Promise
   try {
     const session = await client.createSession({
       model,
-      onPermissionRequest: approveAll,
+      onPermissionRequest: approveAllFn,
       streaming: true,
     });
 
@@ -93,7 +141,7 @@ export async function createAgentSession(options: CreateSessionOptions): Promise
     });
 
     // Subscribe to all SDK events and relay relevant ones
-    session.on((event: SdkSessionEvent) => {
+    session.on((event: any) => {
       const mappedType = mapSdkEventType(event.type);
 
       if (mappedType) {

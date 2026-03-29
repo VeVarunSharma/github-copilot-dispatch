@@ -46,7 +46,7 @@ class AuthViewModel {
                     let result = try await APIClient.shared.pollToken(deviceCode: deviceCode)
                     switch result {
                     case .success(let tokenResponse):
-                        try KeychainManager.shared.saveToken(tokenResponse.accessToken)
+                        try? KeychainManager.shared.saveToken(tokenResponse.accessToken)
                         await APIClient.shared.setAuthToken(tokenResponse.accessToken)
                         isAuthenticated = true
                         isPolling = false

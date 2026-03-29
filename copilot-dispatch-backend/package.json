@@ -2,11 +2,12 @@
   "name": "copilot-dispatch-backend",
   "version": "0.1.0",
   "description": "Backend for GitHub Copilot Dispatch Apple Watch app",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --node-options='--experimental-sqlite' src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node --experimental-sqlite --env-file=.env dist/index.js",
     "lint": "eslint src/",
     "clean": "rm -rf dist/"
   },

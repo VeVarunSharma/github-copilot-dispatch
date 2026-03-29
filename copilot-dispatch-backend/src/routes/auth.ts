@@ -5,6 +5,19 @@ const router = Router();
 
 // POST /device-code — initiate GitHub Device Code Flow
 router.post("/device-code", async (_req: Request, res: Response) => {
+  // Dev mode: return mock device code when OAuth credentials are placeholders
+  if (!config.GITHUB_CLIENT_ID || config.GITHUB_CLIENT_ID === 'placeholder_client_id') {
+    console.log('[Auth] Dev mode: returning mock device code');
+    res.json({
+      userCode: 'MOCK-1234',
+      verificationUri: 'https://github.com/login/device',
+      expiresIn: 900,
+      interval: 5,
+      deviceCode: 'mock_device_code',
+    });
+    return;
+  }
+
   try {
     const response = await fetch("https://github.com/login/device/code", {
       method: "POST",
@@ -21,7 +34,19 @@ router.post("/device-code", async (_req: Request, res: Response) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("GitHub device code error:", response.status, errorText);
-      res.status(response.status).json({ error: "Failed to request device code" });
+      // Fall back to dev mode if GitHub rejects (e.g. Device Flow not enabled)
+      if (process.env.GH_TOKEN) {
+        console.log('[Auth] Device flow failed, falling back to dev mode with GH_TOKEN');
+        res.json({
+          userCode: 'DEV-MODE',
+          verificationUri: 'https://github.com/login/device',
+          expiresIn: 900,
+          interval: 5,
+          deviceCode: 'mock_device_code',
+        });
+        return;
+      }
+      res.status(response.status).json({ error: "Failed to request device code. Enable Device Flow in your GitHub OAuth App settings." });
       return;
     }
 
@@ -48,10 +73,29 @@ router.post("/device-code", async (_req: Request, res: Response) => {
 
 // POST /poll-token — poll for access token during device flow
 router.post("/poll-token", async (req: Request, res: Response) => {
-  const { deviceCode } = req.body as { deviceCode?: string };
+  const { deviceCode } = req.body as { deviceCode?: string; device_code?: string };
+  const code = deviceCode || (req.body as { device_code?: string }).device_code;
 
-  if (!deviceCode) {
+  if (!code) {
     res.status(400).json({ error: "deviceCode is required" });
+    return;
+  }
+
+  // Dev mode: auto-approve with mock device code
+  if (code === 'mock_device_code') {
+    // In dev mode, use the GH_TOKEN env var or prompt to set one
+    const devToken = process.env.GH_TOKEN;
+    if (devToken) {
+      console.log('[Auth] Dev mode: auto-approving with GH_TOKEN');
+      res.status(200).json({
+        accessToken: devToken,
+        tokenType: 'bearer',
+        scope: 'repo,user,read:org',
+      });
+    } else {
+      console.log('[Auth] Dev mode: no GH_TOKEN set, returning pending');
+      res.status(202).json({ status: 'authorization_pending' });
+    }
     return;
   }
 
@@ -64,7 +108,7 @@ router.post("/poll-token", async (req: Request, res: Response) => {
       },
       body: JSON.stringify({
         client_id: config.GITHUB_CLIENT_ID,
-        device_code: deviceCode,
+        device_code: code,
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       }),
     });
