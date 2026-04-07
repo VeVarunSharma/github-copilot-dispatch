@@ -121,6 +121,8 @@ The Watch app communicates with the backend via **short-interval polling** over 
 
 ## Getting Started
 
+> **Want to deploy to your Apple Watch?** See [DEPLOYMENT.md](DEPLOYMENT.md) for a complete step-by-step guide covering local deploy and App Store distribution.
+
 ### Prerequisites
 - Node.js 22+
 - Xcode 16+ with watchOS 11 SDK
