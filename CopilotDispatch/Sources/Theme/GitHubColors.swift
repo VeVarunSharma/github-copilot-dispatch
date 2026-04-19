@@ -71,7 +71,7 @@ struct GitHubLogoView: View {
 
     private func loadImage(name: String, ext: String) -> some View {
         Group {
-            if let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Resources"),
+            if let url = Bundle.main.url(forResource: name, withExtension: ext),
                let data = try? Data(contentsOf: url),
                let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)

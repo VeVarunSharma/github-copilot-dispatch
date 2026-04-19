@@ -10,7 +10,7 @@ let package = Package(
             name: "CopilotDispatch",
             path: "Sources",
             resources: [
-                .copy("Resources")
+                .process("Resources")
             ]
         )
     ]

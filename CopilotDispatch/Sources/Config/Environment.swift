@@ -10,7 +10,7 @@ enum AppEnvironment: String {
         case .local:
             return "http://localhost:3001/api"
         case .staging:
-            return "https://b9b0-2607-fea8-531e-2000-648b-3bbe-cca4-d6ab.ngrok-free.app/api"
+            return "https://copilot-dispatch-staging.azurewebsites.net/api"
         case .production:
             return "https://copilot-dispatch-prod.azurewebsites.net/api"
         }
