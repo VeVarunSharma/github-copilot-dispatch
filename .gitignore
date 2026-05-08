@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.build/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*~
+
+# Environment files with secrets
+copilot-dispatch-backend/.env
+copilot-dispatch-backend/.env.staging
+copilot-dispatch-backend/.env.production
+
+# Keep templates
+!copilot-dispatch-backend/.env.example
